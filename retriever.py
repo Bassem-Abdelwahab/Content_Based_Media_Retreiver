@@ -54,6 +54,7 @@ def layout_similarity_measure(input_layout , model_layout ):
 
 def get_video_key_frames(video):
     current_layout = np.zeros((64,3))
+    self.video.set(cv2.CAP_PROP_POS_FRAMES , 0)
     ret, frame = video.read()
     last_layout = get_color_hist(frame)
     keyframes = []
@@ -208,22 +209,37 @@ class retriever(QWidget):
         self.scene.addPixmap(self.preview)
         self.ui.inputImageGraphicsView.setScene(self.scene)
 
-    def display_img_table(self,path , percentage):
-        rowNum = self.ui.resultTable.rowCount()
-        self.ui.resultTable.setRowCount(rowNum+1)
-        filenam = QLabel(path , self)
-        self.ui.resultTable.setCellWidget(rowNum , 0 , filenam)
-        similSTR = QLabel(str(percentage) , self)
-        self.ui.resultTable.setCellWidget(rowNum , 1 , similSTR)
-        prev = QPixmap(path)
-        prev = prev.scaled(self.ui.inputImageGraphicsView.size(),Qt.KeepAspectRatio)
-        scen = QGraphicsScene(self)
-        scen.addPixmap(prev)
-        graphics = QGraphicsView(self)
-        graphics.setScene(scen)
-        self.ui.resultTable.setCellWidget(rowNum , 2 , graphics)
-
-
+    def display_img_table(self,path , percentage , img_vid = True):
+        if img_vid == True:
+            rowNum = self.ui.resultTable.rowCount()
+            self.ui.resultTable.setRowCount(rowNum+1)
+            filenam = QLabel(path , self)
+            self.ui.resultTable.setCellWidget(rowNum , 0 , filenam)
+            similSTR = QLabel(str(percentage) , self)
+            self.ui.resultTable.setCellWidget(rowNum , 1 , similSTR)
+            prev = QPixmap(path)
+            prev = prev.scaled(self.ui.inputImageGraphicsView.size(),Qt.KeepAspectRatio)
+            scen = QGraphicsScene(self)
+            scen.addPixmap(prev)
+            graphics = QGraphicsView(self)
+            graphics.setScene(scen)
+            self.ui.resultTable.setCellWidget(rowNum , 2 , graphics)
+        else:
+            vid = cv2.VideoCapture(path)
+            total_frames = vid.get(cv2.CAP_PROP_FRAME_COUNT)
+            total_frames = int(total_frames/2)
+            vid.set(cv2.CAP_PROP_POS_FRAMES , total_frames)
+            ret, frm = vid.read()
+            vid.set(cv2.CAP_PROP_POS_FRAMES , 0)
+            height, width, channel = frm.shape
+            bytesPerLine = 3 * width
+            qImg = QImage(cv2Image.data, width, height, bytesPerLine, QImage.Format_BGR888)
+            prev = QPixmap.fromImage(qImg)
+            scen = QGraphicsScene(self)
+            scen.addPixmap(prev)
+            graphics = QGraphicsView(self)
+            graphics.setScene(scen)
+            self.ui.resultTable.setCellWidget(rowNum , 2 , graphics)
 
     def display_input_representation(self,cv2Image):
         if self.indexMethod == 0:
@@ -396,16 +412,20 @@ class retriever(QWidget):
                     rep_list = pickle.load(pickle_in)
                     pickle_in.close()
                     simil_list = []
+                    frame_simil = []
                     simil  = 0
                     for vid in rep_list:
                         for elem in vid[1]:
                             simil = histogram_similarity_measure(histog , elem )
                             if simil >= self.ui.similaritySpinBox.value():
-                                simil_list.append(simil)
-                        if not len(simil_list) ==0:
-                            simil = np.mean(np.array(simil_list))
-                            self.display_img_table(path_list[indx] , simil)
-                        simil_list=[]
+                                frame_simil.append(simil)
+                        if not len(frame_simil) ==0:
+                            simil_list.append(max(frame_simil))
+                        frame_simil =[]
+                    if not len(simil_list) ==0:
+                        simil = np.mean(np.array(simil_list))
+                        self.display_img_table(path_list[indx] , simil)
+                    simil_list=[]
 
 
     def on_addToDataBaseButton_clicked(self):
