@@ -54,7 +54,7 @@ def layout_similarity_measure(input_layout , model_layout ):
 
 def get_video_key_frames(video):
     current_layout = np.zeros((64,3))
-    self.video.set(cv2.CAP_PROP_POS_FRAMES , 0)
+    video.set(cv2.CAP_PROP_POS_FRAMES , 0)
     ret, frame = video.read()
     last_layout = get_color_hist(frame)
     keyframes = []
@@ -65,10 +65,10 @@ def get_video_key_frames(video):
         ret, frame = video.read()
         if ret == True:
             current_layout = get_color_hist(frame)
-            if not histogram_similarity_measure(current_layout,last_layout,50):
+            if not histogram_similarity_measure(current_layout,last_layout) > 50:
                 repeated = False
                 for frm in keyframes:
-                    if not histogram_similarity_measure(current_layout,frm,50):
+                    if not histogram_similarity_measure(current_layout,frm) > 50:
                         repeated = True
                 if not repeated:
                     keyframes.append(current_layout)
@@ -210,13 +210,13 @@ class retriever(QWidget):
         self.ui.inputImageGraphicsView.setScene(self.scene)
 
     def display_img_table(self,path , percentage , img_vid = True):
+        rowNum = self.ui.resultTable.rowCount()
+        self.ui.resultTable.setRowCount(rowNum+1)
+        filenam = QLabel(path , self)
+        self.ui.resultTable.setCellWidget(rowNum , 0 , filenam)
+        similSTR = QLabel(str(percentage) , self)
+        self.ui.resultTable.setCellWidget(rowNum , 1 , similSTR)
         if img_vid == True:
-            rowNum = self.ui.resultTable.rowCount()
-            self.ui.resultTable.setRowCount(rowNum+1)
-            filenam = QLabel(path , self)
-            self.ui.resultTable.setCellWidget(rowNum , 0 , filenam)
-            similSTR = QLabel(str(percentage) , self)
-            self.ui.resultTable.setCellWidget(rowNum , 1 , similSTR)
             prev = QPixmap(path)
             prev = prev.scaled(self.ui.inputImageGraphicsView.size(),Qt.KeepAspectRatio)
             scen = QGraphicsScene(self)
@@ -233,8 +233,9 @@ class retriever(QWidget):
             vid.set(cv2.CAP_PROP_POS_FRAMES , 0)
             height, width, channel = frm.shape
             bytesPerLine = 3 * width
-            qImg = QImage(cv2Image.data, width, height, bytesPerLine, QImage.Format_BGR888)
+            qImg = QImage(frm.data, width, height, bytesPerLine, QImage.Format_BGR888)
             prev = QPixmap.fromImage(qImg)
+            prev = prev.scaled(self.ui.inputImageGraphicsView.size(),Qt.KeepAspectRatio)
             scen = QGraphicsScene(self)
             scen.addPixmap(prev)
             graphics = QGraphicsView(self)
@@ -385,24 +386,24 @@ class retriever(QWidget):
             elif self.indexType ==1:
                 if self.indexMethod ==0:
                     keys = get_video_key_frames(self.video)
-                    pickle_in = open(self.dataBaseFiles[0], 'rb')
-                    path_list = pickle.load(pickle_in)
-                    pickle_in.close()
+#                    pickle_in = open(self.dataBaseFiles[0], 'rb')
+#                    path_list = pickle.load(pickle_in)
+#                    pickle_in.close()
                     pickle_in = open(self.dataBaseFiles[4], 'rb')
                     rep_list = pickle.load(pickle_in)
                     pickle_in.close()
                     simil_list = []
                     simil  = 0
-                    for keyf in keys:
-                        for vid in rep_list:
+                    for vid in rep_list:
+                        for keyf in keys:
                             for elem in vid[1]:
                                 simil = histogram_similarity_measure(keyf , elem )
                                 if simil >= self.ui.similaritySpinBox.value():
                                     simil_list.append(simil)
-                            if not len(simil_list) ==0:
-                                simil = np.mean(np.array(simil_list))
-                                self.display_img_table(path_list[indx] , simil)
-                            simil_list=[]
+                        if not len(simil_list) ==0:
+                            simil = np.mean(np.array(simil_list))
+                            self.display_img_table(vid[0] , simil , False)
+                        simil_list=[]
                 elif self.indexMethod == 1:
                     histog = get_color_hist(self.image)
                     pickle_in = open(self.dataBaseFiles[0], 'rb')
@@ -424,7 +425,7 @@ class retriever(QWidget):
                         frame_simil =[]
                     if not len(simil_list) ==0:
                         simil = np.mean(np.array(simil_list))
-                        self.display_img_table(path_list[indx] , simil)
+                        self.display_img_table(vid[0] , simil , False)
                     simil_list=[]
 
 
